@@ -5,10 +5,15 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.increments('id')
+      table.increments('id').primary()
+      table.string('title').notNullable()
+      table.text('description').nullable()
+      table.string('status').defaultTo('todo').notNullable() // todo, in_progress, completed
+      table.string('priority').defaultTo('medium').notNullable() // low, medium, high
+      table.timestamp('due_date').nullable()
 
-      table.timestamp('created_at')
-      table.timestamp('updated_at')
+      table.timestamp('created_at').notNullable()
+      table.timestamp('updated_at').notNullable()
     })
   }
 

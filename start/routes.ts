@@ -10,6 +10,7 @@
 import { middleware } from '#start/kernel'
 import router from '@adonisjs/core/services/router'
 import { controllers } from '#generated/controllers'
+import TasksController from '#controllers/tasks_controller'
 
 router.get('/', () => {
   return { hello: 'world' }
@@ -33,5 +34,14 @@ router
       .prefix('account')
       .as('profile')
       .use(middleware.auth())
+
+    //remove wrap if auth is unnceessary
+    router.group(() => {
+      router.get('tasks', [TasksController, 'index'])
+      router.post('tasks', [TasksController, 'store'])
+      router.put('tasks/:id', [TasksController, 'update'])
+      router.delete('tasks/:id', [TasksController, 'destroy'])
+    }).use(middleware.auth())
+
   })
   .prefix('/api/v1')
