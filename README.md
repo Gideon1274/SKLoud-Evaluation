@@ -80,7 +80,7 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-Edit `backend/.env` and set your database credentials, then generate a secure `APP_KEY`:
+Edit `backend/.env` and set your database credentials, then generate a secure.`APP_KEY`:
 
 ```bash
 node ace generate:key
