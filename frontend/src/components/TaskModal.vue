@@ -29,7 +29,7 @@ watch(
 )
 
 const submit = () => {
-  if (!form.value.title.trim()) return
+  if (!form.value.title.trim() || !form.value.dueDate) return
   emit('save', { ...form.value })
 }
 
@@ -76,8 +76,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </div>
 
         <div class="form-group">
-          <label for="task-due">Due Date</label>
-          <input id="task-due" v-model="form.dueDate" class="ui-input" type="date" />
+          <label for="task-due">Due Date *</label>
+          <input id="task-due" v-model="form.dueDate" class="ui-input" type="date" required />
         </div>
 
         <div class="modal-actions">
