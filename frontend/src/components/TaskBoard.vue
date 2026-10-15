@@ -16,10 +16,22 @@ const boardEl = ref(null)
 
 const { draggingId, overStatus, startDrag } = useDragDrop({
   onDrop: (task, status) => emit('move', task, status),
-  getScroller: () => boardEl.value,
+  getScroller: () => {
+    if (!boardEl.value) return null
+    let column = boardEl.value.querySelector('.column.over')
+    if (!column) {
+      const columns = boardEl.value.querySelectorAll('.column')
+      column = columns[0]
+    }
+    return column?.querySelector('.column-body') ?? boardEl.value
+  },
 })
 
 const isVisible = (key) => !props.statusFilter || props.statusFilter === key
+
+const handleSwipeMove = (task, newStatus) => {
+  emit('move', task, newStatus)
+}
 </script>
 
 <template>
@@ -38,7 +50,7 @@ const isVisible = (key) => !props.statusFilter || props.statusFilter === key
         <span class="count">{{ tasksByStatus[col.key].length }}</span>
       </header>
 
-      <div class="column-body">
+      <div class="column-body" style="touch-action: pan-y;">
         <TaskCard
           v-for="task in tasksByStatus[col.key]"
           :key="task.id"
@@ -46,6 +58,7 @@ const isVisible = (key) => !props.statusFilter || props.statusFilter === key
           :dragging="draggingId === task.id"
           @pointerdown="startDrag($event, task, $event.currentTarget)"
           @edit="emit('edit', task)"
+          @swipe-move="handleSwipeMove"
         />
 
         <div v-if="tasksByStatus[col.key].length === 0" class="empty">
@@ -132,6 +145,33 @@ const isVisible = (key) => !props.statusFilter || props.statusFilter === key
   flex-direction: column;
   gap: 12px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.column-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.column-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.column-body::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+.column-body::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.column-body {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
 }
 
 .empty {

@@ -1,12 +1,20 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { useSwipe } from '../composables/useSwipe'
 
 const props = defineProps({
   task: { type: Object, required: true },
   dragging: { type: Boolean, default: false },
 })
 
-defineEmits(['edit', 'pointerdown'])
+const emit = defineEmits(['edit', 'pointerdown', 'swipe-move'])
+
+const cardEl = ref(null)
+const isTouchDevice = ref(false)
+
+onMounted(() => {
+  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+})
 
 // Parse "YYYY-MM-DD" (or an ISO string) as a local calendar date so it never shifts by timezone.
 const parseDate = (value) => {
@@ -27,13 +35,38 @@ const overdue = computed(() => {
   today.setHours(0, 0, 0, 0)
   return date < today
 })
+
+const getNextStatus = (status) => {
+  if (status === 'todo') return 'in_progress'
+  if (status === 'in_progress') return 'completed'
+  return null
+}
+
+const { bind, unbind } = useSwipe({
+  disabled: () => !isTouchDevice.value || props.dragging || props.task.status === 'completed',
+  onSwipeRight: () => {
+    const nextStatus = getNextStatus(props.task.status)
+    if (nextStatus) emit('swipe-move', props.task, nextStatus)
+  },
+  onSwipeLeft: () => {
+  },
+})
+
+onMounted(() => {
+  if (cardEl.value) bind(cardEl.value)
+})
+onBeforeUnmount(() => {
+  if (cardEl.value) unbind(cardEl.value)
+})
 </script>
 
 <template>
   <article
+    ref="cardEl"
     class="task-card"
     :class="{ completed: task.status === 'completed', dragging }"
     @pointerdown="$emit('pointerdown', $event)"
+    style="touch-action: pan-y;"
   >
     <div class="task-header">
       <h3>{{ task.title }}</h3>

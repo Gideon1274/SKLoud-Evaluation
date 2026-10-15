@@ -119,13 +119,13 @@ watch(isAuthenticated, (authed) => {
         </div>
       </div>
       <div class="header-right">
-        <button class="ui-btn ui-btn-primary" @click="openCreateModal">+ Add New Task</button>
         <button class="ui-btn ui-btn-ghost" @click="handleLogout">Logout</button>
       </div>
     </header>
 
     <main class="content">
       <div class="toolbar">
+        <button class="ui-btn ui-btn-primary" @click="openCreateModal">New Task</button>
         <div class="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />

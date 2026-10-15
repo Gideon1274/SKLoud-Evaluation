@@ -2,7 +2,7 @@ import { ref, onBeforeUnmount } from 'vue'
 
 const LONG_PRESS_MS = 280 // touch: hold to pick up a card (so normal scrolling still works)
 const MOUSE_THRESHOLD = 5 // mouse: pixels moved before a drag starts
-const TOUCH_CANCEL = 10 // touch: moving further than this before the long-press = user is scrolling
+const TOUCH_CANCEL = 24 // touch: moving further than this before the long-press = user is scrolling
 const EDGE = 56 // px from a screen/board edge where auto-scroll kicks in
 
 /**
@@ -74,9 +74,12 @@ export function useDragDrop({ onDrop, getScroller }) {
     ghost.style.width = `${rect.width}px`
     ghost.style.left = '0px'
     ghost.style.top = '0px'
+    ghost.style.touchAction = 'none'
     document.body.appendChild(ghost)
 
-    active = { task, ghost, offsetX: startX - rect.left, offsetY: startY - rect.top }
+    if (cardEl) cardEl.style.touchAction = 'none'
+
+    active = { task, ghost, offsetX: startX - rect.left, offsetY: startY - rect.top, cardEl }
     pending = null
     draggingId.value = task.id
     document.body.classList.add('is-dragging-task')
@@ -107,6 +110,10 @@ export function useDragDrop({ onDrop, getScroller }) {
       if (scroller.scrollWidth > scroller.clientWidth) {
         if (pointer.x < r.left + EDGE) scroller.scrollLeft -= 12
         else if (pointer.x > r.right - EDGE) scroller.scrollLeft += 12
+      }
+      if (scroller.scrollHeight > scroller.clientHeight) {
+        if (pointer.y < r.top + EDGE) scroller.scrollTop -= 12
+        else if (pointer.y > r.bottom - EDGE) scroller.scrollTop += 12
       }
     }
     if (pointer.y < EDGE) window.scrollBy(0, -12)
@@ -147,7 +154,10 @@ export function useDragDrop({ onDrop, getScroller }) {
 
   const cleanup = () => {
     if (pending) clearTimeout(pending.timer)
-    if (active) active.ghost.remove()
+    if (active) {
+      active.ghost.remove()
+      if (active.cardEl) active.cardEl.style.touchAction = ''
+    }
     if (rafId) cancelAnimationFrame(rafId)
     pending = null
     active = null
