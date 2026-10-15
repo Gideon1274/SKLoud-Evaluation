@@ -4,9 +4,10 @@ import { createTaskValidator, updateTaskValidator } from '#validators/task'
 import { DateTime } from 'luxon'
 
 export default class TasksController {
-    async index({ request, response }: HttpContext) {
+    async index({ request, response, auth }: HttpContext) {
+        const user = auth.getUserOrFail()
         const { status, priority } = request.qs()
-        const query = Task.query()
+        const query = Task.query().where('user_id', user.id)
 
         if (status) query.where('status', status)
         if (priority) query.where('priority', priority)
@@ -15,12 +16,13 @@ export default class TasksController {
         return response.ok(tasks)
     }
 
-    async store({ request, response }: HttpContext) {
+    async store({ request, response, auth }: HttpContext) {
+        const user = auth.getUserOrFail()
         const payload = await request.validateUsing(createTaskValidator)
 
-        // Parse dueDate string into a Luxon DateTime if provided
         const taskData = {
             ...payload,
+            userId: user.id,
             dueDate: payload.dueDate ? DateTime.fromISO(payload.dueDate) : null,
         }
 
@@ -28,8 +30,13 @@ export default class TasksController {
         return response.created(task)
     }
 
-    async update({ params, request, response }: HttpContext) {
-        const task = await Task.findOrFail(params.id)
+    async update({ params, request, response, auth }: HttpContext) {
+        const user = auth.getUserOrFail()
+        const task = await Task.query()
+            .where('id', params.id)
+            .andWhere('user_id', user.id)
+            .firstOrFail()
+
         const payload = await request.validateUsing(updateTaskValidator)
 
         const { dueDate, ...rest } = payload
@@ -45,8 +52,13 @@ export default class TasksController {
         return response.ok(task)
     }
 
-    async destroy({ params, response }: HttpContext) {
-        const task = await Task.findOrFail(params.id)
+    async destroy({ params, response, auth }: HttpContext) {
+        const user = auth.getUserOrFail()
+        const task = await Task.query()
+            .where('id', params.id)
+            .andWhere('user_id', user.id)
+            .firstOrFail()
+
         await task.delete()
         return response.ok({ message: 'Task deleted successfully' })
     }

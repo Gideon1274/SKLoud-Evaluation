@@ -47,11 +47,32 @@
 //   .prefix('/api/v1')
 
 import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
 import TasksController from '#controllers/tasks_controller'
+import { controllers } from '#generated/controllers'
 
 router.group(() => {
-  router.get('/tasks', [TasksController, 'index'])
-  router.post('/tasks', [TasksController, 'store'])
-  router.put('/tasks/:id', [TasksController, 'update'])
-  router.delete('/tasks/:id', [TasksController, 'destroy'])
+  router
+    .group(() => {
+      router.post('signup', [controllers.NewAccount, 'store'])
+      router.post('login', [controllers.AccessTokens, 'store'])
+    })
+    .prefix('auth')
+
+  router
+    .group(() => {
+      router.get('profile', [controllers.Profile, 'show'])
+      router.post('logout', [controllers.AccessTokens, 'destroy'])
+    })
+    .prefix('account')
+    .use(middleware.auth())
+
+  router
+    .group(() => {
+      router.get('tasks', [TasksController, 'index'])
+      router.post('tasks', [TasksController, 'store'])
+      router.put('tasks/:id', [TasksController, 'update'])
+      router.delete('tasks/:id', [TasksController, 'destroy'])
+    })
+    .use(middleware.auth())
 }).prefix('/api')

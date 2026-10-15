@@ -6,6 +6,30 @@ import type { ApiDefinition } from './tree.d.ts'
 const placeholder: any = {}
 
 const routes = {
+  'new_account.store': {
+    methods: ["POST"],
+    pattern: '/api/auth/signup',
+    tokens: [{"old":"/api/auth/signup","type":0,"val":"api","end":""},{"old":"/api/auth/signup","type":0,"val":"auth","end":""},{"old":"/api/auth/signup","type":0,"val":"signup","end":""}],
+    types: placeholder as Registry['new_account.store']['types'],
+  },
+  'access_tokens.store': {
+    methods: ["POST"],
+    pattern: '/api/auth/login',
+    tokens: [{"old":"/api/auth/login","type":0,"val":"api","end":""},{"old":"/api/auth/login","type":0,"val":"auth","end":""},{"old":"/api/auth/login","type":0,"val":"login","end":""}],
+    types: placeholder as Registry['access_tokens.store']['types'],
+  },
+  'profile.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/account/profile',
+    tokens: [{"old":"/api/account/profile","type":0,"val":"api","end":""},{"old":"/api/account/profile","type":0,"val":"account","end":""},{"old":"/api/account/profile","type":0,"val":"profile","end":""}],
+    types: placeholder as Registry['profile.show']['types'],
+  },
+  'access_tokens.destroy': {
+    methods: ["POST"],
+    pattern: '/api/account/logout',
+    tokens: [{"old":"/api/account/logout","type":0,"val":"api","end":""},{"old":"/api/account/logout","type":0,"val":"account","end":""},{"old":"/api/account/logout","type":0,"val":"logout","end":""}],
+    types: placeholder as Registry['access_tokens.destroy']['types'],
+  },
   'tasks.index': {
     methods: ["GET","HEAD"],
     pattern: '/api/tasks',

@@ -7,7 +7,39 @@ const apiClient = axios.create({
   },
 })
 
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_user')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
 export default {
+  login(credentials) {
+    return apiClient.post('/auth/login', credentials)
+  },
+  signup(data) {
+    return apiClient.post('/auth/signup', data)
+  },
+  logout() {
+    return apiClient.post('/account/logout')
+  },
+  getProfile() {
+    return apiClient.get('/account/profile')
+  },
   getTasks(params) {
     return apiClient.get('/tasks', { params })
   },
