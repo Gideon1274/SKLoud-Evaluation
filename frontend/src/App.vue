@@ -1,125 +1,94 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import api from './services/api'
+import { ref, watch, onMounted } from 'vue'
 import { useAuth } from './composables/useAuth'
+import { useTasks, statusLabel } from './composables/useTasks'
 import LoginPage from './components/LoginPage.vue'
+import TaskBoard from './components/TaskBoard.vue'
+import TaskModal from './components/TaskModal.vue'
+import ConfirmModal from './components/ConfirmModal.vue'
 
 const { user, isAuthenticated, logout } = useAuth()
 
-const tasks = ref([])
-const loading = ref(false)
-const errorMessage = ref('')
-const filterStatus = ref('')
-const filterPriority = ref('')
+const {
+  tasks,
+  loading,
+  errorMessage,
+  filterStatus,
+  filterPriority,
+  search,
+  hasActiveFilters,
+  tasksByStatus,
+  fetchTasks,
+  clearFilters,
+  saveTask,
+  moveTask,
+  removeTask,
+} = useTasks(isAuthenticated)
 
+// ---------- Create / edit modal ----------
 const showModal = ref(false)
-const isEditing = ref(false)
-const currentTaskId = ref(null)
-const form = ref({
-  title: '',
-  description: '',
-  status: 'todo',
-  priority: 'medium',
-  dueDate: '',
-})
-
-const fetchTasks = async () => {
-  if (!isAuthenticated.value) return
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    const params = {}
-    if (filterStatus.value) params.status = filterStatus.value
-    if (filterPriority.value) params.priority = filterPriority.value
-
-    const response = await api.getTasks(params)
-    tasks.value = response.data
-  } catch (err) {
-    errorMessage.value = 'Failed to load tasks. Check if backend is running.'
-    console.error(err)
-  } finally {
-    loading.value = false
-  }
-}
+const editingTask = ref(null)
+const saving = ref(false)
 
 const openCreateModal = () => {
-  isEditing.value = false
-  currentTaskId.value = null
-  form.value = { title: '', description: '', status: 'todo', priority: 'medium', dueDate: '' }
+  editingTask.value = null
   showModal.value = true
 }
 
 const openEditModal = (task) => {
-  isEditing.value = true
-  currentTaskId.value = task.id
-  form.value = {
-    title: task.title,
-    description: task.description || '',
-    status: task.status,
-    priority: task.priority,
-    dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-  }
+  editingTask.value = task
   showModal.value = true
 }
 
-const saveTask = async () => {
-  if (!form.value.title.trim()) return
+const closeModal = () => {
+  showModal.value = false
+  editingTask.value = null
+}
 
+const handleSave = async (form) => {
+  saving.value = true
   try {
-    if (isEditing.value) {
-      const response = await api.updateTask(currentTaskId.value, form.value)
-      const index = tasks.value.findIndex((t) => t.id === currentTaskId.value)
-      if (index !== -1) tasks.value[index] = response.data
-    } else {
-      const response = await api.createTask(form.value)
-      tasks.value.unshift(response.data)
-    }
-    showModal.value = false
-    fetchTasks()
+    await saveTask(form, editingTask.value?.id ?? null)
+    closeModal()
   } catch (err) {
-    alert('Error saving task. Please check your inputs.')
+    errorMessage.value = 'Error saving task. Please check your inputs.'
     console.error(err)
+  } finally {
+    saving.value = false
   }
 }
 
-const updateStatus = async (task, newStatus) => {
-  try {
-    const response = await api.updateTask(task.id, { status: newStatus })
-    task.status = response.data.status
-  } catch (err) {
-    alert('Failed to update task status')
+// ---------- Confirmations ----------
+// confirm = { kind: 'move' | 'delete', task, status? }
+const confirm = ref(null)
+
+const handleMove = (task, newStatus) => {
+  // Moving a completed task back to To Do / In Progress needs confirmation.
+  if (task.status === 'completed' && newStatus !== 'completed') {
+    confirm.value = { kind: 'move', task, status: newStatus }
+    return
   }
+  moveTask(task, newStatus)
 }
 
-const deleteTask = async (id) => {
-  if (!confirm('Are you sure you want to delete this task?')) return
+const requestDelete = () => {
+  if (editingTask.value) confirm.value = { kind: 'delete', task: editingTask.value }
+}
 
-  try {
-    await api.deleteTask(id)
-    tasks.value = tasks.value.filter((t) => t.id !== id)
-  } catch (err) {
-    alert('Failed to delete task')
-    console.error(err)
+const onConfirm = async () => {
+  const action = confirm.value
+  confirm.value = null
+  if (!action) return
+  if (action.kind === 'move') {
+    await moveTask(action.task, action.status)
+  } else {
+    await removeTask(action.task.id)
+    closeModal()
   }
 }
 
 const handleLogout = async () => {
   await logout()
-}
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString()
-}
-
-const isOverdue = (dateStr, status) => {
-  if (!dateStr || status === 'completed') return false
-  return new Date(dateStr) < new Date()
-}
-
-const statusLabel = (status) => {
-  const map = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' }
-  return map[status] || status
 }
 
 onMounted(fetchTasks)
@@ -144,118 +113,91 @@ watch(isAuthenticated, (authed) => {
             <path d="M8 12l3 3 5-6" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </div>
-        <div>
+        <div class="titles">
           <h1>TaskFlow</h1>
           <p class="welcome">Welcome back, {{ user?.fullName || user?.email?.split('@')[0] }}</p>
         </div>
       </div>
       <div class="header-right">
-        <button class="btn-primary" @click="openCreateModal">+ Add New Task</button>
-        <button class="btn-logout" @click="handleLogout">Logout</button>
+        <button class="ui-btn ui-btn-primary" @click="openCreateModal">+ Add New Task</button>
+        <button class="ui-btn ui-btn-ghost" @click="handleLogout">Logout</button>
       </div>
     </header>
 
-    <div class="content">
-      <div class="filters">
-        <select v-model="filterStatus" @change="fetchTasks">
+    <main class="content">
+      <div class="toolbar">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            v-model="search"
+            class="ui-input"
+            type="search"
+            placeholder="Search tasks..."
+            aria-label="Search tasks"
+          />
+        </div>
+
+        <select v-model="filterStatus" class="ui-input filter" aria-label="Filter by status" @change="fetchTasks()">
           <option value="">All Statuses</option>
           <option value="todo">To Do</option>
           <option value="in_progress">In Progress</option>
           <option value="completed">Completed</option>
         </select>
 
-        <select v-model="filterPriority" @change="fetchTasks">
+        <select v-model="filterPriority" class="ui-input filter" aria-label="Filter by priority" @change="fetchTasks()">
           <option value="">All Priorities</option>
           <option value="low">Low</option>
           <option value="medium">Medium</option>
           <option value="high">High</option>
         </select>
+
+        <button v-if="hasActiveFilters" class="clear-btn" @click="clearFilters">Clear</button>
       </div>
 
-      <div v-if="loading" class="state-msg">Loading tasks...</div>
-      <div v-if="errorMessage" class="state-msg error">{{ errorMessage }}</div>
-      <div v-if="!loading && tasks.length === 0 && !errorMessage" class="state-msg">
-        No tasks found. Create one to get started!
+      <div v-if="errorMessage" class="state-msg error" role="alert">
+        {{ errorMessage }}
+        <button class="dismiss" aria-label="Dismiss" @click="errorMessage = ''">✕</button>
       </div>
 
-      <div class="task-grid" v-if="!loading && tasks.length > 0">
-        <div v-for="task in tasks" :key="task.id" class="task-card" :class="{ completed: task.status === 'completed' }">
-          <div class="task-header">
-            <h3>{{ task.title }}</h3>
-            <span class="badge" :class="task.priority">{{ task.priority }}</span>
-          </div>
+      <TaskBoard
+        v-if="tasks.length > 0 || hasActiveFilters"
+        :tasks-by-status="tasksByStatus"
+        :status-filter="filterStatus"
+        @edit="openEditModal"
+        @move="handleMove"
+      />
+    </main>
 
-          <p class="description" v-if="task.description">{{ task.description }}</p>
+    <TaskModal
+      v-if="showModal"
+      :task="editingTask"
+      :saving="saving"
+      @save="handleSave"
+      @delete="requestDelete"
+      @close="closeModal"
+    />
 
-          <div class="task-meta" v-if="task.dueDate">
-            <span :class="{ overdue: isOverdue(task.dueDate, task.status) }">
-              📅 Due: {{ formatDate(task.dueDate) }}
-              <span v-if="isOverdue(task.dueDate, task.status)" class="overdue-text">(Overdue)</span>
-            </span>
-          </div>
+    <ConfirmModal
+      v-if="confirm?.kind === 'move'"
+      title="Reopen this task?"
+      :message="`“${confirm.task.title}” is already completed. Move it back to ${statusLabel(confirm.status)}?`"
+      :confirm-text="`Move to ${statusLabel(confirm.status)}`"
+      @confirm="onConfirm"
+      @cancel="confirm = null"
+    />
 
-          <div class="task-actions">
-            <select :value="task.status" @change="updateStatus(task, $event.target.value)">
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
-
-            <div class="action-buttons">
-              <button @click="openEditModal(task)" class="btn-edit">Edit</button>
-              <button @click="deleteTask(task.id)" class="btn-delete">Delete</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-      <div class="modal">
-        <h2>{{ isEditing ? 'Edit Task' : 'Create New Task' }}</h2>
-        <form @submit.prevent="saveTask">
-          <div class="form-group">
-            <label>Title *</label>
-            <input v-model="form.title" type="text" required placeholder="Task title..." />
-          </div>
-
-          <div class="form-group">
-            <label>Description</label>
-            <textarea v-model="form.description" placeholder="Optional details..."></textarea>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Status</label>
-              <select v-model="form.status">
-                <option value="todo">To Do</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>Priority</label>
-              <select v-model="form.priority">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Due Date</label>
-            <input v-model="form.dueDate" type="date" />
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" @click="showModal = false" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Save Task</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <ConfirmModal
+      v-if="confirm?.kind === 'delete'"
+      title="Delete this task?"
+      :message="`“${confirm.task.title}” will be permanently deleted. This can't be undone.`"
+      confirm-text="Delete"
+      danger
+      @confirm="onConfirm"
+      @cancel="confirm = null"
+    />
   </div>
 </template>
 
@@ -271,6 +213,7 @@ watch(isAuthenticated, (authed) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   padding: 20px 40px;
   background: #1e293b;
   border-bottom: 1px solid #334155;
@@ -280,11 +223,13 @@ watch(isAuthenticated, (authed) => {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .logo-mini {
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
 }
 
 .logo-mini svg {
@@ -303,6 +248,13 @@ watch(isAuthenticated, (authed) => {
   margin: 2px 0 0;
   font-size: 13px;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titles {
+  min-width: 0;
 }
 
 .header-right {
@@ -312,212 +264,64 @@ watch(isAuthenticated, (authed) => {
 }
 
 .content {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 32px 40px;
+  padding: 28px 40px 40px;
 }
 
-.filters {
+/* ---------- Search + filters ---------- */
+.toolbar {
   display: flex;
-  gap: 15px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
-.filters select,
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 10px 14px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  color: #e2e8f0;
-  font-size: 14px;
+.search {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 420px;
 }
 
-.filters select:focus,
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-}
-
-.task-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.task-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: border-color 0.2s;
-}
-
-.task-card:hover {
-  border-color: #475569;
-}
-
-.task-card.completed {
-  opacity: 0.6;
-}
-
-.task-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.task-header h3 {
-  margin: 0;
-  font-size: 17px;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.badge {
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  text-transform: uppercase;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.badge.low {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-}
-
-.badge.medium {
-  background: rgba(234, 179, 8, 0.15);
-  color: #facc15;
-}
-
-.badge.high {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-}
-
-.description {
-  color: #94a3b8;
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.task-meta {
-  font-size: 13px;
+.search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
   color: #64748b;
+  pointer-events: none;
 }
 
-.overdue {
-  color: #f87171;
-  font-weight: 600;
+.search .ui-input {
+  padding-left: 38px;
 }
 
-.overdue-text {
-  color: #f87171;
+.filter {
+  width: auto;
+  min-width: 150px;
 }
 
-.task-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid #334155;
-  padding-top: 14px;
-  gap: 10px;
-}
-
-.task-actions select {
-  padding: 6px 10px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  color: #e2e8f0;
-  font-size: 13px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.btn-primary:hover {
-  background: #2563eb;
-}
-
-.btn-secondary {
-  background: #334155;
-  color: #e2e8f0;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.btn-logout {
+.clear-btn {
   background: transparent;
-  color: #94a3b8;
-  border: 1px solid #334155;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
+  border: none;
+  color: #60a5fa;
   font-size: 14px;
-  transition: all 0.2s;
-}
-
-.btn-logout:hover {
-  color: #f87171;
-  border-color: #f87171;
-}
-
-.btn-edit {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  padding: 8px 4px;
 }
 
-.btn-delete {
-  background: #ef4444;
-  color: white;
-  border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+.clear-btn:hover {
+  color: #93c5fd;
+  text-decoration: underline;
 }
 
+/* ---------- States ---------- */
 .state-msg {
+  position: relative;
   text-align: center;
   padding: 60px 20px;
   color: #64748b;
@@ -525,75 +329,70 @@ watch(isAuthenticated, (authed) => {
 }
 
 .state-msg.error {
+  padding: 14px 44px 14px 16px;
+  margin-bottom: 20px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
   color: #f87171;
+  font-size: 14px;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 100;
+.dismiss {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px;
 }
 
-.modal {
-  background: #1e293b;
-  padding: 28px;
-  border-radius: 12px;
-  width: 440px;
-  max-width: 90%;
-  border: 1px solid #334155;
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .app-header {
+    padding: 16px 20px;
+  }
+
+  .content {
+    padding: 20px 16px 32px;
+  }
 }
 
-.modal h2 {
-  margin: 0 0 20px;
-  color: #ffffff;
-  font-size: 22px;
+@media (max-width: 640px) {
+  .app-header {
+    flex-wrap: wrap;
+  }
+
+  .header-right {
+    width: 100%;
+  }
+
+  .header-right .ui-btn-primary {
+    flex: 1;
+  }
+
+  .search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .filter {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+
+  .clear-btn {
+    margin-left: auto;
+  }
 }
 
-.form-group {
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group label {
-  margin-bottom: 6px;
-  font-weight: 600;
-  font-size: 13px;
-  color: #cbd5e1;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 70px;
-}
-
-.form-row {
-  display: flex;
-  gap: 14px;
-}
-
-.form-row .form-group {
-  flex: 1;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+@media (max-width: 420px) {
+  .welcome {
+    display: none;
+  }
 }
 </style>

@@ -27,3 +27,21 @@ select,
 textarea {
   font-family: inherit;
 }
+
+/* ---------- Drag & drop (ghost card is appended to <body>, so these rules are global) ---------- */
+.drag-ghost {
+  position: fixed !important;
+  z-index: 1000;
+  margin: 0 !important;
+  pointer-events: none;
+  opacity: 0.95 !important;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+  border-color: #3b82f6 !important;
+  will-change: transform;
+}
+
+body.is-dragging-task {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}

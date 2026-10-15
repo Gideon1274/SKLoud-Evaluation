@@ -1,0 +1,150 @@
+/* Shared UI primitives for the dashboard (prefixed so they never collide with LoginPage styles). */
+
+/* ---------- Buttons ---------- */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.ui-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ui-btn-primary {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.ui-btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.ui-btn-secondary {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.ui-btn-secondary:hover:not(:disabled) {
+  background: #475569;
+}
+
+.ui-btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.ui-btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.ui-btn-ghost {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  font-weight: 500;
+}
+
+.ui-btn-ghost:hover:not(:disabled) {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+.ui-btn-ghost-danger {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-weight: 500;
+}
+
+.ui-btn-ghost-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #f87171;
+}
+
+.ui-btn:focus-visible,
+.ui-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+
+/* ---------- Inputs ---------- */
+.ui-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.ui-input::placeholder {
+  color: #64748b;
+}
+
+.ui-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+select.ui-input {
+  cursor: pointer;
+}
+
+/* ---------- Modal shell ---------- */
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  z-index: 100;
+  overflow-y: auto;
+}
+
+.ui-modal {
+  background: #1e293b;
+  padding: 28px;
+  border-radius: 12px;
+  width: 440px;
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
+
+.ui-modal h2 {
+  margin: 0 0 20px;
+  color: #ffffff;
+  font-size: 22px;
+}
+
+@media (max-width: 480px) {
+  .ui-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .ui-modal {
+    width: 100%;
+    max-height: 92vh;
+    padding: 22px 18px;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+  }
+}
