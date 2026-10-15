@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, unref, watch, onMounted } from 'vue'
 import { useAuth } from './composables/useAuth'
 import { useTasks, statusLabel } from './composables/useTasks'
 import LoginPage from './components/LoginPage.vue'
@@ -44,6 +44,16 @@ const closeModal = () => {
   showModal.value = false
   editingTask.value = null
 }
+
+const showBoard = computed(() => {
+  // A status filter is active: show the board only if that status has tasks
+  if (filterStatus.value) {
+    const groups = unref(tasksByStatus) ?? {}
+    return (groups[filterStatus.value]?.length ?? 0) > 0
+  }
+  // No status filter: keep the original behavior
+  return tasks.value.length > 0 || hasActiveFilters.value
+})
 
 const handleSave = async (form) => {
   saving.value = true
@@ -162,8 +172,13 @@ watch(isAuthenticated, (authed) => {
         <button class="dismiss" aria-label="Dismiss" @click="errorMessage = ''">✕</button>
       </div>
 
+      <div v-if="loading && tasks.length === 0" class="state-msg">Loading tasks...</div>
+      <div v-else-if="!errorMessage && tasks.length === 0" class="state-msg">
+        {{ hasActiveFilters ? 'No tasks match your filters.' : 'No tasks found. Create one to get started!' }}
+      </div>
+
       <TaskBoard
-        v-if="tasks.length > 0 || hasActiveFilters"
+        v-if="showBoard"
         :tasks-by-status="tasksByStatus"
         :status-filter="filterStatus"
         @edit="openEditModal"
