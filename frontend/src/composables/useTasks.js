@@ -40,6 +40,34 @@ export function useTasks(isAuthenticated) {
     return grouped
   })
 
+  // ---------- Selection (bulk actions) ----------
+  const selectedIds = ref([])
+
+  // Only tasks that are currently visible can be acted on, so hidden (filtered-out) tasks are never touched.
+  const selectedTasks = computed(() =>
+    visibleTasks.value.filter((t) => selectedIds.value.includes(t.id))
+  )
+  const selectedCount = computed(() => selectedTasks.value.length)
+  const allVisibleSelected = computed(
+    () => visibleTasks.value.length > 0 && selectedCount.value === visibleTasks.value.length
+  )
+
+  const isSelected = (id) => selectedIds.value.includes(id)
+
+  const toggleSelect = (id) => {
+    selectedIds.value = isSelected(id)
+      ? selectedIds.value.filter((x) => x !== id)
+      : [...selectedIds.value, id]
+  }
+
+  const toggleSelectAll = () => {
+    selectedIds.value = allVisibleSelected.value ? [] : visibleTasks.value.map((t) => t.id)
+  }
+
+  const clearSelection = () => {
+    selectedIds.value = []
+  }
+
   const fetchTasks = async ({ silent = false } = {}) => {
     if (!isAuthenticated.value) return
     if (!silent) loading.value = true
@@ -51,6 +79,8 @@ export function useTasks(isAuthenticated) {
 
       const response = await api.getTasks(params)
       tasks.value = response.data
+      const existing = new Set(tasks.value.map((t) => t.id))
+      selectedIds.value = selectedIds.value.filter((id) => existing.has(id))
     } catch (err) {
       errorMessage.value = 'Failed to load tasks. Check if backend is running.'
       console.error(err)
@@ -94,12 +124,44 @@ export function useTasks(isAuthenticated) {
     }
   }
 
+  /** Optimistically move several tasks to another status; rolls back if the API call fails. */
+  const moveTasks = async (list, newStatus) => {
+    const targets = list.filter((t) => t.status !== newStatus)
+    if (targets.length === 0) return
+    const previous = new Map(targets.map((t) => [t.id, t.status]))
+    targets.forEach((t) => (t.status = newStatus))
+    try {
+      await api.bulkUpdateStatus(targets.map((t) => t.id), newStatus)
+      clearSelection()
+    } catch (err) {
+      targets.forEach((t) => (t.status = previous.get(t.id)))
+      errorMessage.value = 'Failed to update task status.'
+      console.error(err)
+    }
+  }
+
+  /** Soft delete: the task goes to the trash and can be restored from there. */
   const removeTask = async (id) => {
     try {
       await api.deleteTask(id)
       tasks.value = tasks.value.filter((t) => t.id !== id)
+      selectedIds.value = selectedIds.value.filter((x) => x !== id)
     } catch (err) {
-      errorMessage.value = 'Failed to delete task.'
+      errorMessage.value = 'Failed to move task to trash.'
+      console.error(err)
+    }
+  }
+
+  /** Soft delete several tasks at once. */
+  const removeTasks = async (ids) => {
+    if (ids.length === 0) return
+    try {
+      await api.bulkTrashTasks(ids)
+      const gone = new Set(ids)
+      tasks.value = tasks.value.filter((t) => !gone.has(t.id))
+      selectedIds.value = selectedIds.value.filter((id) => !gone.has(id))
+    } catch (err) {
+      errorMessage.value = 'Failed to move tasks to trash.'
       console.error(err)
     }
   }
@@ -112,11 +174,22 @@ export function useTasks(isAuthenticated) {
     filterPriority,
     search,
     hasActiveFilters,
+    visibleTasks,
     tasksByStatus,
+    selectedIds,
+    selectedTasks,
+    selectedCount,
+    allVisibleSelected,
+    isSelected,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
     fetchTasks,
     clearFilters,
     saveTask,
     moveTask,
+    moveTasks,
     removeTask,
+    removeTasks,
   }
 }

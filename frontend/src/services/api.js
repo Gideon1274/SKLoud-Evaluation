@@ -52,4 +52,19 @@ export default {
   deleteTask(id) {
     return apiClient.delete(`/tasks/${id}`)
   },
+  getTrash() {
+    return apiClient.get('/tasks/trash')
+  },
+  bulkUpdateStatus(ids, status) {
+    return apiClient.post('/tasks/bulk/status', { ids, status })
+  },
+  bulkTrashTasks(ids) {
+    return apiClient.post('/tasks/bulk/trash', { ids })
+  },
+  restoreTasks(ids) {
+    return apiClient.post('/tasks/bulk/restore', { ids })
+  },
+  purgeTasks(ids) {
+    return apiClient.post('/tasks/bulk/purge', { ids })
+  },
 }

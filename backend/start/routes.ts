@@ -70,7 +70,15 @@ router.group(() => {
   router
     .group(() => {
       router.get('tasks', [TasksController, 'index'])
+      router.get('tasks/trash', [TasksController, 'trash'])
       router.post('tasks', [TasksController, 'store'])
+
+      // Bulk actions (declared before the :id routes)
+      router.post('tasks/bulk/status', [TasksController, 'bulkStatus'])
+      router.post('tasks/bulk/trash', [TasksController, 'bulkTrash'])
+      router.post('tasks/bulk/restore', [TasksController, 'restore'])
+      router.post('tasks/bulk/purge', [TasksController, 'purge'])
+
       router.put('tasks/:id', [TasksController, 'update'])
       router.delete('tasks/:id', [TasksController, 'destroy'])
     })

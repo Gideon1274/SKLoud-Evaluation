@@ -33,7 +33,7 @@ export class AuthAccessTokenSchema extends BaseModel {
 }
 
 export class TaskSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'dueDate', 'id', 'priority', 'status', 'title', 'updatedAt', 'userId'] as const
+  static $columns = ['createdAt', 'description', 'dueDate', 'id', 'isActive', 'priority', 'status', 'title', 'updatedAt', 'userId'] as const
   $columns = TaskSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -43,6 +43,8 @@ export class TaskSchema extends BaseModel {
   declare dueDate: DateTime | null
   @column({ isPrimary: true })
   declare id: number
+  @column()
+  declare isActive: boolean
   @column()
   declare priority: string
   @column()

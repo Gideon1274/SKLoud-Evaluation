@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import TaskCard from './TaskCard.vue'
 import { STATUSES } from '../composables/useTasks'
 import { useDragDrop } from '../composables/useDragDrop'
@@ -8,14 +8,52 @@ const props = defineProps({
   tasksByStatus: { type: Object, required: true },
   // When a status filter is active, only that column is shown.
   statusFilter: { type: String, default: '' },
+  // Ids of the tasks currently checked (they are dragged / swiped together).
+  selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['edit', 'move'])
+const emit = defineEmits(['edit', 'move', 'toggle-select'])
 
 const boardEl = ref(null)
 
+// ---------- Ordering: high → medium → low, then oldest created first ----------
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
+const priorityRank = (p) => PRIORITY_ORDER[p] ?? 3
+
+const createdTime = (task) => {
+  const t = Date.parse(task.createdAt ?? task.created_at ?? '')
+  return Number.isNaN(t) ? null : t
+}
+
+// Falls back to id (auto-increment) when there is no usable creation timestamp.
+const compareAge = (a, b) => {
+  const ta = createdTime(a)
+  const tb = createdTime(b)
+  if (ta !== null && tb !== null && ta !== tb) return ta - tb
+  return Number(a.id) - Number(b.id)
+}
+
+const sortedTasks = computed(() => {
+  const result = {}
+  for (const col of STATUSES) {
+    result[col.key] = [...(props.tasksByStatus[col.key] || [])].sort(
+      (a, b) => priorityRank(a.priority) - priorityRank(b.priority) || compareAge(a, b)
+    )
+  }
+  return result
+})
+
 const { draggingId, overStatus, startDrag } = useDragDrop({
+  getDragElements: (task) =>
+  props.selectedIds.includes(task.id)
+    ? props.selectedIds
+        .filter((id) => id !== task.id)
+        .map((id) => boardEl.value?.querySelector(`[data-task-id="${id}"]`))
+        .filter(Boolean)
+    : [],
+
   onDrop: (task, status) => emit('move', task, status),
+  getDragCount: (task) => (props.selectedIds.includes(task.id) ? props.selectedIds.length : 1),
   getScroller: () => {
     if (!boardEl.value) return null
     let column = boardEl.value.querySelector('.column.over')
@@ -26,6 +64,12 @@ const { draggingId, overStatus, startDrag } = useDragDrop({
     return column?.querySelector('.column-body') ?? boardEl.value
   },
 })
+
+// While a checked card is dragged, every checked card looks "picked up".
+const isDragging = (task) =>
+  draggingId.value !== null &&
+  (draggingId.value === task.id ||
+    (props.selectedIds.includes(draggingId.value) && props.selectedIds.includes(task.id)))
 
 const isVisible = (key) => !props.statusFilter || props.statusFilter === key
 
@@ -47,21 +91,23 @@ const handleSwipeMove = (task, newStatus) => {
       <header class="column-header">
         <span class="dot"></span>
         <h2>{{ col.label }}</h2>
-        <span class="count">{{ tasksByStatus[col.key].length }}</span>
+        <span class="count">{{ sortedTasks[col.key].length }}</span>
       </header>
 
       <div class="column-body" style="touch-action: pan-y;">
         <TaskCard
-          v-for="task in tasksByStatus[col.key]"
+          v-for="task in sortedTasks[col.key]"
           :key="task.id"
           :task="task"
-          :dragging="draggingId === task.id"
+          :dragging="isDragging(task)"
+          :selected="selectedIds.includes(task.id)"
           @pointerdown="startDrag($event, task, $event.currentTarget)"
           @edit="emit('edit', task)"
+          @toggle-select="emit('toggle-select', task.id)"
           @swipe-move="handleSwipeMove"
         />
 
-        <div v-if="tasksByStatus[col.key].length === 0" class="empty">
+        <div v-if="sortedTasks[col.key].length === 0" class="empty">
           {{ draggingId !== null ? 'Drop here' : 'No tasks' }}
         </div>
       </div>
@@ -147,7 +193,7 @@ const handleSwipeMove = (task, newStatus) => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 350px);
   padding-right: 4px;
   margin-right: -4px;
 }

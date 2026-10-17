@@ -67,9 +67,69 @@ export interface Registry {
       errorResponse: unknown
     }
   }
+  'tasks.trash': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/tasks/trash'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
   'tasks.store': {
     methods: ["POST"]
     pattern: '/api/tasks'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
+  'tasks.bulk_status': {
+    methods: ["POST"]
+    pattern: '/api/tasks/bulk/status'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
+  'tasks.bulk_trash': {
+    methods: ["POST"]
+    pattern: '/api/tasks/bulk/trash'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
+  'tasks.restore': {
+    methods: ["POST"]
+    pattern: '/api/tasks/bulk/restore'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
+  'tasks.purge': {
+    methods: ["POST"]
+    pattern: '/api/tasks/bulk/purge'
     types: {
       body: {}
       paramsTuple: []

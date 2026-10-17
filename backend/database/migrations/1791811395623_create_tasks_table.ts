@@ -10,6 +10,9 @@ export default class extends BaseSchema {
       table.text('description').nullable()
       table.string('status').defaultTo('todo').notNullable() // todo, in_progress, completed
       table.string('priority').defaultTo('medium').notNullable() // low, medium, high
+
+      table.boolean('is_active').defaultTo(true).notNullable()
+      
       table.timestamp('due_date').nullable()
 
       table.timestamp('created_at').notNullable()

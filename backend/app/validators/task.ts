@@ -19,3 +19,21 @@ export const updateTaskValidator = vine.compile(
         dueDate: vine.string().optional(),
     })
 )
+
+const idsRule = vine
+    .array(vine.number().positive().withoutDecimals())
+    .minLength(1)
+    .maxLength(200)
+
+export const bulkIdsValidator = vine.compile(
+    vine.object({
+        ids: idsRule,
+    })
+)
+
+export const bulkStatusValidator = vine.compile(
+    vine.object({
+        ids: idsRule,
+        status: vine.enum(['todo', 'in_progress', 'completed']),
+    })
+)

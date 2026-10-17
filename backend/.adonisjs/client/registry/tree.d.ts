@@ -14,7 +14,12 @@ export interface ApiDefinition {
   }
   tasks: {
     index: typeof routes['tasks.index']
+    trash: typeof routes['tasks.trash']
     store: typeof routes['tasks.store']
+    bulkStatus: typeof routes['tasks.bulk_status']
+    bulkTrash: typeof routes['tasks.bulk_trash']
+    restore: typeof routes['tasks.restore']
+    purge: typeof routes['tasks.purge']
     update: typeof routes['tasks.update']
     destroy: typeof routes['tasks.destroy']
   }

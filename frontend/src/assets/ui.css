@@ -103,6 +103,47 @@ select.ui-input {
   cursor: pointer;
 }
 
+/* ---------- Checkbox ---------- */
+.ui-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  background-color: transparent; /* blends into whatever dark surface it sits on */
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px 16px;
+  border: 2px solid #64748b;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.ui-checkbox:hover {
+  border-color: #94a3b8;
+}
+
+.ui-checkbox:checked {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+.ui-checkbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+
+@media (pointer: coarse) {
+  .ui-checkbox {
+    width: 28px;
+    height: 28px;
+    background-size: 18px 18px;
+  }
+}
+
 /* ---------- Modal shell ---------- */
 .ui-overlay {
   position: fixed;

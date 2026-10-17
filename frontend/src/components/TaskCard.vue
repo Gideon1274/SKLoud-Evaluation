@@ -5,9 +5,10 @@ import { useSwipe } from '../composables/useSwipe'
 const props = defineProps({
   task: { type: Object, required: true },
   dragging: { type: Boolean, default: false },
+  selected: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['edit', 'pointerdown', 'swipe-move'])
+const emit = defineEmits(['edit', 'pointerdown', 'swipe-move', 'toggle-select'])
 
 const cardEl = ref(null)
 const isTouchDevice = ref(false)
@@ -64,16 +65,29 @@ onBeforeUnmount(() => {
   <article
     ref="cardEl"
     class="task-card"
-    :class="{ completed: task.status === 'completed', dragging }"
+    :data-task-id="task.id"
+    :class="{ completed: task.status === 'completed', dragging, selected }"
     @pointerdown="$emit('pointerdown', $event)"
     style="touch-action: pan-y;"
   >
-    <div class="task-header">
-      <h3>{{ task.title }}</h3>
-      <span class="badge" :class="task.priority">{{ task.priority }}</span>
-    </div>
+    <label class="select-rail" title="Select task" @click.stop>
+      <input
+        type="checkbox"
+        class="ui-checkbox"
+        :checked="selected"
+        :aria-label="`Select ${task.title}`"
+        @change="$emit('toggle-select')"
+      />
+    </label>
 
-    <p v-if="task.description" class="description">{{ task.description }}</p>
+    <div class="task-body">
+      <div class="task-header">
+        <h3>{{ task.title }}</h3>
+        <span class="badge" :class="task.priority">{{ task.priority }}</span>
+      </div>
+
+      <p v-if="task.description" class="description">{{ task.description }}</p>
+    </div>
 
     <div class="task-footer">
       <span class="due" :class="{ overdue }">
@@ -106,10 +120,13 @@ onBeforeUnmount(() => {
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 12px;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-areas:
+    'rail body'
+    'footer footer';
+  flex-shrink: 0; /* never squash cards inside the scrolling column */
   text-align: left;
   cursor: grab;
   user-select: none;
@@ -126,6 +143,33 @@ onBeforeUnmount(() => {
   opacity: 0.55;
 }
 
+.task-card.selected {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.select-rail {
+  grid-area: rail;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  cursor: pointer;
+}
+
+.select-rail:hover .ui-checkbox:not(:checked) {
+  border-color: #94a3b8;
+}
+
+.task-body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px 18px 4px 0;
+}
+
 .task-card.dragging {
   opacity: 0.3;
   border-style: dashed;
@@ -139,6 +183,8 @@ onBeforeUnmount(() => {
 }
 
 .task-header h3 {
+  flex: 1 1 0;
+  min-width: 0;
   margin: 0;
   font-size: 18px;
   line-height: 1.3;
@@ -182,11 +228,12 @@ onBeforeUnmount(() => {
 }
 
 .task-footer {
+  grid-area: footer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 2px;
+  padding: 10px 18px 14px 18px;
 }
 
 .due {
@@ -232,6 +279,10 @@ onBeforeUnmount(() => {
 }
 
 @media (pointer: coarse) {
+  .task-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
   .cog-btn {
     width: 40px;
     height: 40px;
@@ -240,7 +291,19 @@ onBeforeUnmount(() => {
 
 @media (max-width: 480px) {
   .task-card {
-    padding: 14px;
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .select-rail {
+    padding-top: 14px;
+  }
+
+  .task-body {
+    padding: 14px 14px 4px 0;
+  }
+
+  .task-footer {
+    padding: 10px 14px 12px;
   }
 
   .task-header h3 {

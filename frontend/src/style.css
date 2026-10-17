@@ -41,6 +41,25 @@ textarea {
   touch-action: none;
 }
 
+.drag-ghost-extra {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* Badge shown on the ghost when several selected tasks are dragged together */
+.drag-ghost[data-count]::after {
+  content: attr(data-count) ' tasks';
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #3b82f6;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
 body.is-dragging-task {
   cursor: grabbing;
   user-select: none;

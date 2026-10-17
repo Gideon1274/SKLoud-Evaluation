@@ -17,7 +17,7 @@ export function useSwipe({ onSwipeRight, onSwipeLeft, disabled = false }) {
 
   const handleTouchStart = (e) => {
     if (disabled.value || e.touches.length !== 1) return
-    if (e.target.closest('button, a, input, select, textarea, .cog-btn')) return
+    if (e.target.closest('button, a, input, select, textarea, label, .cog-btn')) return
 
     const touch = e.touches[0]
     startX = touch.clientX

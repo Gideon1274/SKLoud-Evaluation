@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useAuth } from './composables/useAuth'
 import { useTasks, statusLabel } from './composables/useTasks'
 import LoginPage from './components/LoginPage.vue'
 import TaskBoard from './components/TaskBoard.vue'
 import TaskModal from './components/TaskModal.vue'
+import TrashView from './components/TrashView.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 
 const { user, isAuthenticated, logout } = useAuth()
@@ -18,12 +19,45 @@ const {
   search,
   hasActiveFilters,
   tasksByStatus,
+  selectedTasks,
+  selectedCount,
+  allVisibleSelected,
+  toggleSelect,
+  toggleSelectAll,
+  clearSelection,
   fetchTasks,
   clearFilters,
   saveTask,
   moveTask,
+  moveTasks,
   removeTask,
+  removeTasks,
 } = useTasks(isAuthenticated)
+
+// ---------- Views (board / trash) ----------
+// Kept in the URL hash so the browser back button and refresh behave as expected.
+const view = ref(window.location.hash === '#/trash' ? 'trash' : 'board')
+
+const syncViewFromHash = () => {
+  view.value = window.location.hash === '#/trash' ? 'trash' : 'board'
+}
+
+const openTrash = () => {
+  clearSelection()
+  window.location.hash = '#/trash'
+}
+
+const closeTrash = () => {
+  window.location.hash = ''
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+  view.value = 'board'
+}
+
+watch(view, (v) => {
+  if (v === 'board') fetchTasks({ silent: true })
+})
+
+const selectedIds = computed(() => selectedTasks.value.map((t) => t.id))
 
 // ---------- Create / edit modal ----------
 const showModal = ref(false)
@@ -70,16 +104,34 @@ const handleSave = async (form) => {
 }
 
 // ---------- Confirmations ----------
-// confirm = { kind: 'move' | 'delete', task, status? }
+// confirm = { kind: 'move' | 'delete' | 'bulkDelete', tasks?, task?, status? }
 const confirm = ref(null)
 
+// If the task being moved is part of the selection, the whole selection moves with it.
+const moveTargets = (task) => (selectedIds.value.includes(task.id) ? selectedTasks.value : [task])
+
 const handleMove = (task, newStatus) => {
-  // Moving a completed task back to To Do / In Progress needs confirmation.
-  if (task.status === 'completed' && newStatus !== 'completed') {
-    confirm.value = { kind: 'move', task, status: newStatus }
+  const targets = moveTargets(task)
+  const reopening = newStatus !== 'completed' && targets.some((t) => t.status === 'completed')
+
+  // Moving completed tasks back to To Do / In Progress needs confirmation.
+  if (reopening) {
+    confirm.value = { kind: 'move', tasks: targets, status: newStatus }
     return
   }
-  moveTask(task, newStatus)
+  if (targets.length > 1) moveTasks(targets, newStatus)
+  else moveTask(task, newStatus)
+}
+
+const handleBulkMove = (event) => {
+  const status = event.target.value
+  event.target.value = ''
+  if (!status || selectedTasks.value.length === 0) return
+  handleMove(selectedTasks.value[0], status)
+}
+
+const requestBulkDelete = () => {
+  if (selectedCount.value > 0) confirm.value = { kind: 'bulkDelete', tasks: [...selectedTasks.value] }
 }
 
 const requestDelete = () => {
@@ -91,7 +143,10 @@ const onConfirm = async () => {
   confirm.value = null
   if (!action) return
   if (action.kind === 'move') {
-    await moveTask(action.task, action.status)
+    if (action.tasks.length > 1) await moveTasks(action.tasks, action.status)
+    else await moveTask(action.tasks[0], action.status)
+  } else if (action.kind === 'bulkDelete') {
+    await removeTasks(action.tasks.map((t) => t.id))
   } else {
     await removeTask(action.task.id)
     closeModal()
@@ -102,7 +157,11 @@ const handleLogout = async () => {
   await logout()
 }
 
-onMounted(fetchTasks)
+onMounted(() => {
+  fetchTasks()
+  window.addEventListener('hashchange', syncViewFromHash)
+})
+onBeforeUnmount(() => window.removeEventListener('hashchange', syncViewFromHash))
 
 watch(isAuthenticated, (authed) => {
   if (authed) {
@@ -134,9 +193,22 @@ watch(isAuthenticated, (authed) => {
       </div>
     </header>
 
-    <main class="content">
+    <main v-if="view === 'trash'" class="content">
+      <TrashView @back="closeTrash" @restored="fetchTasks({ silent: true })" />
+    </main>
+
+    <main v-else class="content">
       <div class="toolbar">
         <button class="ui-btn ui-btn-primary" @click="openCreateModal">New Task</button>
+        <button class="ui-btn ui-btn-secondary trash-btn" @click="openTrash">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+          Trash
+        </button>
         <div class="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -178,12 +250,33 @@ watch(isAuthenticated, (authed) => {
         {{ hasActiveFilters ? 'No tasks match your filters.' : 'No tasks found. Create one to get started!' }}
       </div>
 
+      <div v-if="showBoard" class="selection-bar" :class="{ active: selectedCount > 0 }">
+        <label class="select-all">
+          <input type="checkbox" class="ui-checkbox" :checked="allVisibleSelected" @change="toggleSelectAll" />
+          <span>{{ selectedCount > 0 ? `${selectedCount} selected` : 'Select all' }}</span>
+        </label>
+
+        <template v-if="selectedCount > 0">
+          <select class="ui-input bulk-move" aria-label="Move selected tasks to" @change="handleBulkMove">
+            <option value="">Move to…</option>
+            <option value="todo">To Do</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+          </select>
+          <button class="ui-btn ui-btn-ghost-danger" @click="requestBulkDelete">Move to Trash</button>
+          <button class="clear-btn" @click="clearSelection">Clear</button>
+        </template>
+        <span v-else class="hint">Drag a checked task to move all checked tasks together.</span>
+      </div>
+
       <TaskBoard
         v-if="showBoard"
         :tasks-by-status="tasksByStatus"
         :status-filter="filterStatus"
+        :selected-ids="selectedIds"
         @edit="openEditModal"
         @move="handleMove"
+        @toggle-select="toggleSelect"
       />
     </main>
 
@@ -198,18 +291,32 @@ watch(isAuthenticated, (authed) => {
 
     <ConfirmModal
       v-if="confirm?.kind === 'move'"
-      title="Reopen this task?"
-      :message="`“${confirm.task.title}” is already completed. Move it back to ${statusLabel(confirm.status)}?`"
-      :confirm-text="`Move to ${statusLabel(confirm.status)}`"
+      :title="confirm.tasks.length > 1 ? 'Reopen completed tasks?' : 'Reopen this task?'"
+      :message="
+        confirm.tasks.length > 1
+          ? `${confirm.tasks.filter((t) => t.status === 'completed').length} of the ${confirm.tasks.length} selected tasks are already completed. Move all ${confirm.tasks.length} tasks to ${statusLabel(confirm.status)}?`
+          : `“${confirm.tasks[0].title}” is already completed. Move it back to ${statusLabel(confirm.status)}?`
+      "
+      :confirm-text="confirm.tasks.length > 1 ? `Move ${confirm.tasks.length} tasks` : `Move to ${statusLabel(confirm.status)}`"
       @confirm="onConfirm"
       @cancel="confirm = null"
     />
 
     <ConfirmModal
       v-if="confirm?.kind === 'delete'"
-      title="Delete this task?"
-      :message="`“${confirm.task.title}” will be permanently deleted. This can't be undone.`"
-      confirm-text="Delete"
+      title="Move this task to Trash?"
+      :message="`“${confirm.task.title}” will be moved to the trash. You can restore it from there at any time.`"
+      confirm-text="Move to Trash"
+      danger
+      @confirm="onConfirm"
+      @cancel="confirm = null"
+    />
+
+    <ConfirmModal
+      v-if="confirm?.kind === 'bulkDelete'"
+      :title="`Move ${confirm.tasks.length} ${confirm.tasks.length === 1 ? 'task' : 'tasks'} to Trash?`"
+      :message="`The selected ${confirm.tasks.length === 1 ? 'task' : 'tasks'} will be moved to the trash. You can restore ${confirm.tasks.length === 1 ? 'it' : 'them'} from there at any time.`"
+      confirm-text="Move to Trash"
       danger
       @confirm="onConfirm"
       @cancel="confirm = null"
@@ -335,6 +442,51 @@ watch(isAuthenticated, (authed) => {
   text-decoration: underline;
 }
 
+/* ---------- Trash button + selection bar ---------- */
+.trash-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: rgba(30, 41, 59, 0.35);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.selection-bar.active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.bulk-move {
+  width: auto;
+  min-width: 150px;
+}
+
+.hint {
+  font-size: 13px;
+  color: #64748b;
+}
+
 /* ---------- States ---------- */
 .state-msg {
   position: relative;
@@ -403,6 +555,24 @@ watch(isAuthenticated, (authed) => {
 
   .clear-btn {
     margin-left: auto;
+  }
+
+  .trash-btn {
+    flex: 1;
+  }
+
+  .toolbar > .ui-btn-primary {
+    flex: 1;
+  }
+
+  .selection-bar .bulk-move,
+  .selection-bar .ui-btn-ghost-danger {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+
+  .hint {
+    display: none;
   }
 }
 
