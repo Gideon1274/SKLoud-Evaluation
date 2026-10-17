@@ -55,7 +55,7 @@ SKLoud-Evalution/
 Clone the repository and install dependencies in both apps.
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Gideon1274/SKLoud-Evaluation.git
 cd SKLoud-Evalution
 ```
 
